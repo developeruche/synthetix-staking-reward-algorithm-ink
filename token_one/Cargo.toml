@@ -1,5 +1,5 @@
 [package]
-name = "token_one"
+name = "token_two"
 version = "0.1.0"
 authors = ["[your_name] <[your_email]>"]
 edition = "2021"
@@ -10,8 +10,13 @@ ink = { version = "4.0.0-beta", default-features = false }
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 scale-info = { version = "2.3", default-features = false, features = ["derive"], optional = true }
 
+# entrying the brush dependency 
+openbrush = { tag = "3.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = ["psp22"] }
+
+
+
 [lib]
-name = "token_one"
+name = "skate_token_one"
 path = "lib.rs"
 crate-type = [
 	# Used for normal contract Wasm blobs.
@@ -24,5 +29,7 @@ std = [
     "ink/std",
     "scale/std",
     "scale-info/std",
+    # Brush dependency
+    "openbrush/std",
 ]
 ink-as-dependency = []
