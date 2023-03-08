@@ -11,11 +11,12 @@ scale = { package = "parity-scale-codec", version = "3", default-features = fals
 scale-info = { version = "2.3", default-features = false, features = ["derive"], optional = true }
 
 # entrying the brush dependency 
-openbrush = { version = "~2.3.0", default-features = false }
+openbrush = { tag = "3.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = ["psp22"] }
+
 
 
 [lib]
-name = "token_two"
+name = "skate_token_two"
 path = "lib.rs"
 crate-type = [
 	# Used for normal contract Wasm blobs.
