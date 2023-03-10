@@ -86,7 +86,7 @@ pub mod staking_reward_contract {
     pub struct RewardPaid {
         #[ink(topic)]
         caller:AccountId,
-        amount: Balance,
+        reward: Balance,
     }
 
     
@@ -400,12 +400,12 @@ pub mod staking_reward_contract {
 
             if reward > 0 {
                 self.rewards.insert(account, &(0));
-                self.transfer(account, self.reward_token, amount);
+                self.transfer(account, self.reward_token, reward);
 
                 self.env().emit_event(
                     RewardPaid {
                         caller: account,
-                        amount
+                        reward
                     }
                 );
             }
