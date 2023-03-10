@@ -52,7 +52,12 @@ pub mod staking_reward_contract {
     #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Error {
-        NotAdmin
+        NotAdmin,
+        AmountShouldBeGreaterThanZero,
+        InsufficientFunds,
+        NotEnoughAllowance,
+        TokenTransferFailed,
+        Overflow
     }
 
 
@@ -61,10 +66,10 @@ pub mod staking_reward_contract {
     // EVENTS DECLARATION 
     // ===================================
     #[ink(event)]
-    pub struct NewTPA {
+    pub struct Staked {
+        #[ink(topic)]
         caller:AccountId,
-        psp22_address:AccountId,
-        lp_fee: Balance,
+        amount: Balance,
     }
 
 
@@ -72,9 +77,9 @@ pub mod staking_reward_contract {
 
     #[ink(impl)]
     impl Contract {
-        // =====================================
-        // MODIFIERS AND AUTHORIZATION GATE 
-        // =====================================
+        // ================================================
+        // MODIFIERS, AUTHORIZATION GATE AND SANITY CHECKS 
+        // ================================================
         
         fn only_owner(&self) -> Result<(), Error> {
             if self.env().caller() == self.admin {
@@ -96,6 +101,71 @@ pub mod staking_reward_contract {
 
         fn zero_address(&self) -> AccountId {
             [0u8; 32].into()
+        }
+
+
+        fn transfer_from(
+            &self,
+            from: AccountId,
+            to: AccountId,
+            token: AccountId,
+            amount: Balance
+        ) { 
+            // checking the balance of the sender to see if the sender has enough balance to run this transfer 
+            let user_current_balance = PSP22Ref::balance_of(
+                &token,
+                from
+            );
+
+            ensure!(user_current_balance >= amount, Error::InsufficientFunds);
+
+
+            // checking if enough allowance has been made for this operation 
+            let staking_contract_allowance = PSP22Ref::allowance(
+                &token,
+                from,
+                to
+            );
+
+            ensure!(staking_contract_allowance >= amount, Error::NotEnoughAllowance);
+
+            let staking_contract_initial_balance = PSP22Ref::balance_of(
+                &token,
+                to
+            );
+
+
+            // making the transfer call to the token contract 
+            if PSP22Ref::transfer_from_builder(
+                &token,
+                from,
+                to,
+                amount,
+                vec![])
+                    .call_flags(CallFlags::default()
+                    .set_allow_reentry(true))
+                    .try_invoke()
+                    .expect("Transfer failed")
+                    .is_err(){
+                        return Err(Error::TokenTransferFailed);
+            }
+
+            let staking_contract_balance_after_transfer = PSP22Ref::balance_of(
+                &token,
+                to
+            );
+
+            let mut actual_token_staked:Balance = 0;
+        
+            // calculating the actual amount that came in to the contract, some token might have taxes, just confirming transfer for economic safety
+            match staking_contract_balance_after_transfer.checked_sub(staking_contract_initial_balance) {
+                Some(result) => {
+                    actual_token_staked = result;
+                }
+                None => {
+                    return Err(Error::Overflow);
+                }
+            };
         }
     }
 
@@ -213,18 +283,38 @@ pub mod staking_reward_contract {
             self.reward_rate * self.reward_duration
         }
 
+        #[ink(message)]
+        pub fn return_address_zero(
+            &self
+        ) -> AccountId {
+            self.zero_address()
+        }
+
 
         // ===============================
         // WRITE FUNCTIONS
         // ===============================
 
-        // #[ink(message)]
-        // pub fn stake(
-        //     &self,
-        //     amount: Balance
-        // ) {
-        //     self.reward_rate * self.reward_duration
-        // }
+        #[ink(message)]
+        pub fn stake(
+            &mut self,
+            amount: Balance
+        ) {
+            let account = self.env().caller();
+            self.update_reward(account);
+            ensure!(amount > 0, Error::AmountShouldBeGreaterThanZero);
+            self.total_supply += amount;
+            self.balances.insert(account, &(self.balance_of(account) + amount));
+
+            self.transfer_from(account, self.env().account_id(), self.staked_token, amount);
+
+            self.env().emit_event(
+                Staked {
+                    caller: account,
+                    amount
+                }
+            )
+        }
 
 
     }
