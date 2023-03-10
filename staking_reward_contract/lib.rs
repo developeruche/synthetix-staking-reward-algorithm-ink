@@ -466,6 +466,25 @@ pub mod staking_reward_contract {
 
             Ok(())
         }
+        
+
+        #[ink(message)]
+        pub fn pull_out_psp22_tokens(
+            &mut self,
+            token: AccountId,
+            amount: Balance
+        ) -> Result<(), Error> {
+            self.only_owner()?;
+            let account = self.env().caller();
+            self.transfer_from(
+                self.env().account_id(),
+                account,
+                token,
+                amount
+            )?;
+
+            Ok(())
+        }
     }
 }
 
