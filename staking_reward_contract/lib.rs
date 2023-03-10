@@ -400,7 +400,7 @@ pub mod staking_reward_contract {
 
             if reward > 0 {
                 self.rewards.insert(account, &(0));
-                self.transfer(account, self.reward_token, reward);
+                self.transfer(account, self.reward_token, reward)?;
 
                 self.env().emit_event(
                     RewardPaid {
@@ -409,6 +409,18 @@ pub mod staking_reward_contract {
                     }
                 );
             }
+
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn exit(
+            &mut self
+        ) -> Result<(), Error> {
+            let account = self.env().caller();
+            let balance = self.balances.get(account).unwrap_or(0);
+            self.withdraw(balance);
+            self.get_reward();
 
             Ok(())
         }
