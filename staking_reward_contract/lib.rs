@@ -88,9 +88,14 @@ pub mod staking_reward_contract {
             self.reward_per_token_stored = self.reward_per_token();
             self.last_updated_time = self.last_time_reward_applicable();
 
-            if account.is_zero() {
+            if account == self.zero_address() {
                 self.rewards.insert(account, &(self.earned(account)));
+                self.user_reward_per_token.insert(account, &(self.reward_per_token_stored));
             }
+        }
+
+        fn zero_address(&self) -> AccountId {
+            [0u8; 32].into()
         }
     }
 
@@ -110,6 +115,8 @@ pub mod staking_reward_contract {
 
 
     }
+
+    
 
 
     #[ink(impl)]
