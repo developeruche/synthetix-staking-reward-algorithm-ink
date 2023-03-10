@@ -1,6 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
-        
+
+
+
+
 #[openbrush::contract]
 pub mod staking_reward_contract {
 
@@ -11,7 +14,7 @@ pub mod staking_reward_contract {
     use openbrush::{
         contracts::{
             traits::psp22::PSP22Ref,
-        }, traits::{ZERO_ADDRESS},
+        },
     }; // this would be used for psp22 token interaction 
     use ink::{storage::Mapping};
     use ink::env::CallFlags;
@@ -110,15 +113,16 @@ pub mod staking_reward_contract {
             to: AccountId,
             token: AccountId,
             amount: Balance
-        ) { 
+        ) -> Result<(), Error> { 
             // checking the balance of the sender to see if the sender has enough balance to run this transfer 
             let user_current_balance = PSP22Ref::balance_of(
                 &token,
                 from
             );
 
-            ensure!(user_current_balance >= amount, Error::InsufficientFunds);
-
+            if user_current_balance < amount {
+                return Err(Error::InsufficientFunds)
+            }
 
             // checking if enough allowance has been made for this operation 
             let staking_contract_allowance = PSP22Ref::allowance(
@@ -127,7 +131,9 @@ pub mod staking_reward_contract {
                 to
             );
 
-            ensure!(staking_contract_allowance >= amount, Error::NotEnoughAllowance);
+            if staking_contract_allowance < amount {
+                return Err(Error::NotEnoughAllowance)
+            }
 
             let staking_contract_initial_balance = PSP22Ref::balance_of(
                 &token,
@@ -166,6 +172,8 @@ pub mod staking_reward_contract {
                     return Err(Error::Overflow);
                 }
             };
+
+            Ok(())
         }
     }
 
@@ -299,10 +307,13 @@ pub mod staking_reward_contract {
         pub fn stake(
             &mut self,
             amount: Balance
-        ) {
+        ) -> Result<(), Error> {
             let account = self.env().caller();
             self.update_reward(account);
-            ensure!(amount > 0, Error::AmountShouldBeGreaterThanZero);
+
+            if amount <= 0 {
+                return Err(Error::AmountShouldBeGreaterThanZero);
+            }
             self.total_supply += amount;
             self.balances.insert(account, &(self.balance_of(account) + amount));
 
@@ -313,7 +324,9 @@ pub mod staking_reward_contract {
                     caller: account,
                     amount
                 }
-            )
+            );
+
+            Ok(())
         }
 
 
