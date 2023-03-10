@@ -75,6 +75,19 @@ pub mod staking_reward_contract {
         amount: Balance,
     }
 
+    #[ink(event)]
+    pub struct Withdraw {
+        #[ink(topic)]
+        caller:AccountId,
+        amount: Balance,
+    }
+
+    #[ink(event)]
+    pub struct RewardPaid {
+        #[ink(topic)]
+        caller:AccountId,
+        amount: Balance,
+    }
 
     
 
@@ -104,6 +117,27 @@ pub mod staking_reward_contract {
 
         fn zero_address(&self) -> AccountId {
             [0u8; 32].into()
+        }
+
+        fn transfer(
+            &self,
+            to: AccountId,
+            token: AccountId,
+            amount: Balance
+        ) -> Result<(), Error> { 
+            PSP22Ref::transfer(
+                &token,
+                to,
+                amount,
+                vec![])
+                    .unwrap_or_else(|error| {
+                    panic!(
+                        "Failed to transfer PSP22 2 tokens to caller : {:?}",
+                        error
+                    )
+            });
+
+            Ok(())
         }
 
 
@@ -317,7 +351,7 @@ pub mod staking_reward_contract {
             self.total_supply += amount;
             self.balances.insert(account, &(self.balance_of(account) + amount));
 
-            self.transfer_from(account, self.env().account_id(), self.staked_token, amount);
+            self.transfer_from(account, self.env().account_id(), self.staked_token, amount)?;
 
             self.env().emit_event(
                 Staked {
@@ -329,7 +363,55 @@ pub mod staking_reward_contract {
             Ok(())
         }
 
+        #[ink(message)]
+        pub fn withdraw(
+            &mut self,
+            amount: Balance
+        ) -> Result<(), Error> {
+            let account = self.env().caller();
+            self.update_reward(account);
 
+            if amount <= 0 {
+                return Err(Error::AmountShouldBeGreaterThanZero);
+            }
+
+            self.total_supply -= amount;
+            self.balances.insert(account, &(self.balance_of(account) - amount));
+
+            self.transfer(self.staked_token, account, amount)?;
+
+            self.env().emit_event(
+                Withdraw {
+                    caller: account,
+                    amount
+                }
+            );
+
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn get_reward(
+            &mut self
+        ) -> Result<(), Error> {
+            let account = self.env().caller();
+            let reward = self.rewards.get(account).unwrap_or(0);
+            self.update_reward(account);
+
+            if reward > 0 {
+                self.rewards.insert(account, &(0));
+                self.transfer(account, self.reward_token, amount);
+
+                self.env().emit_event(
+                    RewardPaid {
+                        caller: account,
+                        amount
+                    }
+                );
+            }
+
+            Ok(())
+        }
     }
 }
 
