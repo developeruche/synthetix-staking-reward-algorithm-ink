@@ -60,7 +60,8 @@ pub mod staking_reward_contract {
         InsufficientFunds,
         NotEnoughAllowance,
         TokenTransferFailed,
-        Overflow
+        Overflow,
+        StakingStillInProgress
     }
 
 
@@ -92,6 +93,11 @@ pub mod staking_reward_contract {
     #[ink(event)]
     pub struct RewardNotified {
         reward: Balance,
+    }
+
+    #[ink(event)]
+    pub struct DurationUpdate {
+        duration: Balance,
     }
 
     #[ink(impl)]
@@ -484,6 +490,27 @@ pub mod staking_reward_contract {
             )?;
 
             Ok(())
+        }
+
+
+        #[ink(message)]
+        pub fn set_reward_duration(
+            &mut self,
+            duration: Balance
+        ) -> Result<(), Error> {
+            self.only_owner()?;
+
+            if self.env().block_timestamp() <= self.period_to_finish {
+                return Err(Error::StakingStillInProgress)
+            } // admin would not be able to update the staking duration while staking is still on going
+
+            self.reward_duration = duration;
+
+            self.env().emit_event(
+                DurationUpdate {
+                    duration
+                }
+            );
         }
     }
 }
