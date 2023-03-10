@@ -500,7 +500,7 @@ pub mod staking_reward_contract {
         ) -> Result<(), Error> {
             self.only_owner()?;
 
-            if self.env().block_timestamp() <= self.period_to_finish {
+            if self.env().block_timestamp() as u128 <= self.period_to_finish {
                 return Err(Error::StakingStillInProgress)
             } // admin would not be able to update the staking duration while staking is still on going
 
@@ -511,6 +511,8 @@ pub mod staking_reward_contract {
                     duration
                 }
             );
+
+            Ok(())
         }
     }
 }
