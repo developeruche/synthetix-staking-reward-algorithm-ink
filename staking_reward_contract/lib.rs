@@ -89,7 +89,10 @@ pub mod staking_reward_contract {
         reward: Balance,
     }
 
-    
+    #[ink(event)]
+    pub struct RewardNotified {
+        reward: Balance,
+    }
 
     #[ink(impl)]
     impl Contract {
@@ -419,8 +422,47 @@ pub mod staking_reward_contract {
         ) -> Result<(), Error> {
             let account = self.env().caller();
             let balance = self.balances.get(account).unwrap_or(0);
-            self.withdraw(balance);
-            self.get_reward();
+            self.withdraw(balance)?;
+            self.get_reward()?;
+
+            Ok(())
+        }
+
+        //===============================
+        // GATED FUNCTIONS
+        // ==============================
+
+        #[ink(message)]
+        pub fn notify_reward_amount(
+            &mut self,
+            reward: Balance
+        ) -> Result<(), Error> {
+            self.only_owner()?;
+            self.update_reward(self.zero_address());
+            let account = self.env().caller();
+
+            // transferring the reward token from the admin to the staking contract
+            self.transfer_from(account, self.env().account_id(), self.reward_token, reward)?;
+
+            if self.env().block_timestamp() as u128 >= self.period_to_finish {
+                // this means the staking period has not started 
+                self.reward_rate = reward / self.reward_duration;
+            } else {
+                let remaining_staking_time = self.period_to_finish - self.env().block_timestamp() as u128;
+                let left_over_reward = remaining_staking_time * self.reward_rate;
+
+                self.reward_rate = (reward + left_over_reward) / self.reward_duration;
+            }
+
+            self.last_updated_time = self.env().block_timestamp() as u128;
+            self.period_to_finish = self.env().block_timestamp() as u128 + self.reward_duration;
+
+
+            self.env().emit_event(
+                RewardNotified {
+                    reward
+                }
+            );
 
             Ok(())
         }
